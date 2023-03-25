@@ -49,7 +49,7 @@ class AES:
         else:
             self.nr = 14
 
-        self.key = self.key_state(key)
+        self.key = self.get_state(key)
         self.nk = len(key) // 4
         self.nw = self.nb * (self.nr + 1)
 
@@ -76,10 +76,6 @@ class AES:
 
         self.rcon = self.rcon * 2
         self.key = temp
-        print(self.key)
-
-    def xor_strings(self, xs, ys):
-        return "".join(chr(ord(x) ^ ord(y)) for x, y in zip(xs, ys))
 
         # words = []
         # words += self.key_split_to_32()
@@ -108,10 +104,10 @@ class AES:
         return words_32
 
     # Generate key 0
-    def key_state(self, key):
+    def get_state(self, text):
         state = []
         for i in range(16):
-            state.append(hex(ord(key[i])))
+            state.append(hex(ord(text[i])))
 
         return state
 
@@ -138,11 +134,35 @@ class AES:
             sWord.append(hex(self.Sbox[boxIndex]))
         return sWord
 
+    def encrypt(self, text):
+        state = self.get_state(text)
+        result_state = self.add_round_key(state)
+
+        for i in range(self.nr):
+            result_state = self.sub_word(result_state)
+            self.shift_rows(result_state)
+            self.key_generator()
+
+        print(result_state)
+
+
+    def add_round_key(self, text):
+        result = []
+        for i in range(len(text)):
+            result.append(hex(int(self.key[i], 16) ^ int(text[i], 16)))
+
+        return result
+
+    def shift_rows(self, state):
+        state[4], state[5], state[6], state[7] = state[7], state[4], state[5], state[6]
+        state[8], state[9], state[10], state[11] = state[10], state[11], state[8], state[9]
+        state[12], state[13], state[14], state[15] = state[13], state[14], state[15], state[12]
+
+
 aes = AES("TEAMSCORPIAN1234")
 # words = []
 # words += aes.key_split_to_32()
 # for i in range(0, 8):
 #     print(words[i])
 
-for i in range(14):
-    print(aes.key_generator())
+aes.encrypt("MESSAGEENCRPTION")
