@@ -1,5 +1,8 @@
 class AES:
-    Rcon = (0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a)
+    Rcon = (0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
+            0x80, 0x1B, 0x36, 0x6C, 0xD8, 0xAB, 0x4D, 0x9A,
+            0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A,
+            0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39)
 
     Sbox = (0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
             0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -36,6 +39,7 @@ class AES:
                 0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D)
 
     nb = 4
+    rcon = 0x01
 
     def __init__(self, key):
         if len(key) * 16 == 128:
@@ -45,30 +49,51 @@ class AES:
         else:
             self.nr = 14
 
-        self.key = key
-        self.nk = len(key) // 8
+        self.key = self.key_state(key)
+        self.nk = len(key) // 4
         self.nw = self.nb * (self.nr + 1)
 
     def rot_word(self, word):
         return word[1:] + word[:1]
 
-    def get_state(self, data):
-        return [data[i * 4:(i * 4) + 1] for i in range(self.nk)]
+    def key_generator(self):
+        subKey = self.rot_word(self.key[len(self.key)-4:])
+        subKey = self.sub_word(subKey)
 
-    def key_expansion(self):
-        words = []
-        words += self.key_split_to_32()
-        print(words)
-        for w in range(self.nk, self.nw):
-            temp = words[w - 1]
-            print(temp)
-            if w % self.nk == 0:
-                temp = self.sub_word(self.rot_word(temp)) ^ self.Rcon[w // self.nk - 1]
-                print(temp)
-            elif self.nk > 6 and w % self.nk == 4:
-                temp = self.sub_word(temp)
-            words.append(self.xor(words[w - self.nk], temp))
-        return words
+        temp = []
+        index = 0
+        for i in range(self.nk):
+            for j in range(4):
+                result = int(self.key[index], 16) ^ int(subKey[j], 16)
+
+                if not i + j:
+                    result = result ^ self.rcon
+
+                temp.append(hex(result))
+                index += 1
+
+            subKey = temp[i*4:]
+
+        self.rcon = self.rcon * 2
+        self.key = temp
+        print(self.key)
+
+    def xor_strings(self, xs, ys):
+        return "".join(chr(ord(x) ^ ord(y)) for x, y in zip(xs, ys))
+
+        # words = []
+        # words += self.key_split_to_32()
+        # print(words)
+        # for w in range(self.nk, self.nw):
+        #     temp = words[w - 1]
+        #     print(temp)
+        #     if w % self.nk == 0:
+        #         temp = self.sub_word(self.rot_word(temp)) ^ self.Rcon[w // self.nk - 1]
+        #         print(temp)
+        #     elif self.nk > 6 and w % self.nk == 4:
+        #         temp = self.sub_word(temp)
+        #     words.append(self.xor(words[w - self.nk], temp))
+        # return words
 
     def key_split_to_32(self):
         words_32 = []
@@ -79,35 +104,45 @@ class AES:
                 self.key[4 * i + 4] + self.key[4 * i + 5],
                 self.key[4 * i + 6] + self.key[4 * i + 7],
             ))
+        print(words_32)
         return words_32
 
+    # Generate key 0
+    def key_state(self, key):
+        state = []
+        for i in range(16):
+            state.append(hex(ord(key[i])))
+
+        return state
+
     def sub_word(self, word):
-        letters = {"A": 10, "B": 11, "C": 12, "D": 13, "E": 14, "F": 15}
+        letters = {"a": 10, "b": 11, "c": 12, "d": 13, "e": 14, "f": 15}
         sWord = []
 
         for i in range(len(word)):
-            if word[i][0].isnumeric():
-                row = int(word[i][0])
-            else:
-                row = letters[word[i][0]]
+            if len(word[i]) == 3:
+                word[i] = word[i] + "0"
 
-            if word[i][1].isnumeric():
-                col = int(word[i][1])
+            if word[i][2].isnumeric():
+                row = int(word[i][2])
             else:
-                col = letters[word[i][1]]
+                row = letters[word[i][2]]
+
+            if word[i][3].isnumeric():
+                col = int(word[i][3])
+            else:
+                col = letters[word[i][3]]
 
             boxIndex = row * 16 + col
 
-            sWord.insert(0, hex(self.Sbox[boxIndex]))
+            sWord.append(hex(self.Sbox[boxIndex]))
         return sWord
 
-    def xor(self, first, second):
-        return (a ^ b for (a, b) in zip(first, second))
-
-aes = AES("2F423F4528482B4D6250655368566D597133743677397A24432646294A404E63")
+aes = AES("TEAMSCORPIAN1234")
 # words = []
 # words += aes.key_split_to_32()
 # for i in range(0, 8):
 #     print(words[i])
 
-print(aes.key_expansion())
+for i in range(14):
+    print(aes.key_generator())
